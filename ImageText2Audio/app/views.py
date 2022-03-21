@@ -121,6 +121,7 @@ def index():
 def upload_image():
     if request.files:
         image = request.files["image"]
+        print(image)
 
         if image.filename == "":
             return redirect(request.url)
