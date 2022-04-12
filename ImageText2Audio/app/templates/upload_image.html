@@ -1,33 +1,150 @@
 {% extends "basic.html" %}
 
-{% block title %}Upload Images{% endblock %}
+{% block title %}Text-to-Audio: Upload{% endblock %}
 
 {% block main %}
 
+<style>
+#webcam {
+  width: 500px;
+  aspect-ratio: 0.707;
+}
+
+.modal canvas {
+  width: 100%;
+  height: auto;
+}
+
+@media only screen and (max-width: 768px) {
+  #webcam {
+    width: 80%;
+  }
+}
+</style>
+
 <main>
   <div class="b-example-divider"></div>
-  <div class="px-4 py-5 my-5 text-center">
+  <div class="px-8 py-10 my-5 text-center">
     <img class="d-block mx-auto mb-4" src="https://929687.smushcdn.com/2633864/wp-content/uploads/2020/05/tesseract_text_localization_tesseract_logo.png?lossy=1&strip=1&webp=1" alt="Tesseract OCR" height="93">
-    <h1 class="display-5 fw-bold">Upload an Image</h1>
+    <h1 class="display-5 fw-bold">Text-To-Audio Converter</h1>
+    <h3 class="fw-bold">Upload an Image</h3>
     <div class="col-lg-6 mx-auto">
       <p class="lead mb-4">
-        <form action="/upload-image" method="POST" enctype="multipart/form-data">
+        <!-- <form action="/upload-image" method="POST" enctype="multipart/form-data" id="myform"> -->
           <div class="row lead mb-4">
-            <div class="col-md-4">
+            <!-- <div class="col-md-4">
               <label class="custom-file-label" for="image">Select Image</label>
+            </div> -->
+            <div class="col-md-12">
+              <!-- <input type="file" class="form-control" name="image" id="image"  accept="image/*" capture> -->
+              <!--  <input type="file" class="form-control" name="image" multiple="true" id="image"> -->
+              <video id="webcam" autoplay playsinline></video>
+              <canvas id="canvas" class="d-none"></canvas>
             </div>
-            <div class="col-md-8">
-              <input type="file" class="form-control" name="image" id="image">
+
+            <div class="col-md-12 text-center mb-3">
+              <button class="btn btn-primary btn-lg px-4 gap-3" id="clickSnap" disabled>Click</button>
+            </div>
+
+            <div class="col-md-12 text-center" id="Loader" style="display:none">
+              <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+            </div>
+
+            <div class="col-md-12 text-center">
+              <button type="button" class="btn btn-secondary btn-lg px-4 gap-3" data-bs-toggle="modal" data-bs-target="#exampleModal" id="finalButton" style="visibility:hidden;">
+                Convert to Audio Book
+                <span class="badge bg-primary" id="numberOfImages">0</span>
+              </button>
             </div>
           </div>
           <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
-            <button type="submit" class="btn btn-primary btn-lg px-4 gap-3">Upload</button>
+          <!--  <button type="submit" class="btn btn-primary btn-lg px-4 gap-3">Upload</button> -->
           </div>
-        </form>
+        <!-- </form> -->
       </p>
     </div>
   </div>
   <div class="b-example-divider"></div>
+
+  <!-- Modal -->
+  <div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="exampleModalLabel">AudioBook Pages</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div id="myDIV"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="upload()">Convert to Audio Book</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </main>
+
+<script>
+var fd = new FormData();
+const vid = document.querySelector('video');
+navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }) // request cam
+.then(stream => {
+  vid.srcObject = stream; // don't use createObjectURL(MediaStream)
+  return vid.play(); // returns a Promise
+})
+.then(()=>{ // enable the button
+  const btn = document.querySelector('#clickSnap');
+  const finalBtn = document.querySelector('#finalButton');
+  btn.disabled = false;
+  btn.onclick = e => {
+    btn.disabled = true;
+    takeASnap()
+    .then(download);
+    btn.disabled = false;
+    finalBtn.style.visibility = 'visible';
+  };
+})
+.catch(e=>console.log('please use the fiddle instead'));
+
+function takeASnap(){
+  const canvas = document.createElement('canvas'); // create a canvas
+  const ctx = canvas.getContext('2d'); // get its context
+  canvas.width = vid.videoWidth; // set its size to the one of the video
+  canvas.height = vid.videoHeight;
+  ctx.drawImage(vid, 0,0); // the video
+  document.getElementById("myDIV").appendChild(canvas);
+
+  $('#numberOfImages').html(parseInt($('#numberOfImages').html()) + 1);
+
+  return new Promise((res, rej)=>{
+    canvas.toBlob(res, 'image/jpeg'); // request a Blob from the canvas
+  });
+}
+
+function download(blob){
+  fd.append('image', blob, `screenshot_${Math.floor(Date.now() / 1000)}.jpeg`);
+}
+
+function upload() {
+  $('#webcam').fadeOut();
+  $('#clickSnap').fadeOut();
+  $('#finalButton').fadeOut();
+
+  $('#Loader').fadeIn();
+
+  $.ajax({
+      type: 'POST',
+      url: '/upload-image',
+      data: fd,
+      processData: false,
+      contentType: false
+  }).done(function(data) {
+      $("body").html(data);
+  });
+}
+</script>
 
 {% endblock %}
