@@ -27,7 +27,15 @@ def allowed_image(filename):
         return True
     else:
         return False
-    
+
+def result(imageFiles):
+    textCombined = []
+    for ImageName in imageFiles:
+        if os.path.isfile(ImageName):
+            textList = getText(ImageName)
+            textCombined.extend(textList)
+    return textCombined
+
 def automatic_brightness_and_contrast(image, clip_hist_percent=1):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     
@@ -120,30 +128,29 @@ def index():
 @app.route("/upload-image", methods=["POST"])
 def upload_image():
     if request.files:
-        image = request.files["image"]
-        print(image)
+        images = request.files.getlist("image")
+        imageFiles = []
+        for image in images:
+            if image.filename == "":
+                return redirect(request.url)
 
-        if image.filename == "":
-            return redirect(request.url)
+            if allowed_image(image.filename):
+                filename = secure_filename(image.filename)
+                ImageName = os.path.join(app.config["IMAGE_UPLOADS"], filename)
+                imageFiles.append(ImageName)
+                image.save(os.path.join(app.config["IMAGE_UPLOADS"], filename))
+            else:
+                return redirect(request.url)
+        
+        textCombined = result(imageFiles)
 
-        if allowed_image(image.filename):
-            filename = secure_filename(image.filename)
-            session['ImageName'] = os.path.join(app.config["IMAGE_UPLOADS"], filename)
-            image.save(os.path.join(app.config["IMAGE_UPLOADS"], filename))
-            return redirect("/result")
+        if textCombined:
+            return render_template("result.html", text=textCombined, audioFilePath=convertToAudio("\n".join(textCombined)))
 
-        else:
-            return redirect(request.url)
+        return redirect("/")
 
     return redirect("/")
-
-@app.route("/result")
-def result():
-    if os.path.isfile(session['ImageName']):
-        textList = getText(session['ImageName'])
-        return render_template("result.html", text=textList, audioFilePath=convertToAudio("\n".join(textList)))
-    return redirect('/upload-image')
-    
+        
 @app.route('/audio/<path:filename>')
 def download_file(filename):
     return send_from_directory(f'/home/gaurang/projects/ImageText-to-Audio/ImageText2Audio/audio', filename)

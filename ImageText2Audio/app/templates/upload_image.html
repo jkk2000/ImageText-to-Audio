@@ -5,9 +5,20 @@
 {% block main %}
 
 <style>
-video {
-  -webkit-transform: scaleX(-1);
-  transform: scaleX(-1);
+#webcam {
+  width: 500px;
+  aspect-ratio: 0.707;
+}
+
+.modal canvas {
+  width: 100%;
+  height: auto;
+}
+
+@media only screen and (max-width: 768px) {
+  #webcam {
+    width: 80%;
+  }
 }
 </style>
 
@@ -26,11 +37,26 @@ video {
             </div> -->
             <div class="col-md-12">
               <!-- <input type="file" class="form-control" name="image" id="image"  accept="image/*" capture> -->
-              <video id="webcam" autoplay playsinline width="640" height="480"></video>
+              <!--  <input type="file" class="form-control" name="image" multiple="true" id="image"> -->
+              <video id="webcam" autoplay playsinline></video>
               <canvas id="canvas" class="d-none"></canvas>
             </div>
-            <div class="col-md-12 text-center">
+
+            <div class="col-md-12 text-center mb-3">
               <button class="btn btn-primary btn-lg px-4 gap-3" id="clickSnap" disabled>Click</button>
+            </div>
+
+            <div class="col-md-12 text-center" id="Loader" style="display:none">
+              <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+            </div>
+
+            <div class="col-md-12 text-center">
+              <button type="button" class="btn btn-secondary btn-lg px-4 gap-3" data-bs-toggle="modal" data-bs-target="#exampleModal" id="finalButton" style="visibility:hidden;">
+                Convert to Audio Book
+                <span class="badge bg-primary" id="numberOfImages">0</span>
+              </button>
             </div>
           </div>
           <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
@@ -41,22 +67,44 @@ video {
     </div>
   </div>
   <div class="b-example-divider"></div>
+
+  <!-- Modal -->
+  <div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="exampleModalLabel">AudioBook Pages</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div id="myDIV"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="upload()">Convert to Audio Book</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </main>
 
 <script>
+var fd = new FormData();
 const vid = document.querySelector('video');
-navigator.mediaDevices.getUserMedia({video: true}) // request cam
+navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }) // request cam
 .then(stream => {
   vid.srcObject = stream; // don't use createObjectURL(MediaStream)
   return vid.play(); // returns a Promise
 })
 .then(()=>{ // enable the button
   const btn = document.querySelector('#clickSnap');
+  const finalBtn = document.querySelector('#finalButton');
   btn.disabled = false;
   btn.onclick = e => {
     btn.disabled = true;
     takeASnap()
     .then(download);
+    btn.disabled = false;
+    finalBtn.style.visibility = 'visible';
   };
 })
 .catch(e=>console.log('please use the fiddle instead'));
@@ -67,13 +115,26 @@ function takeASnap(){
   canvas.width = vid.videoWidth; // set its size to the one of the video
   canvas.height = vid.videoHeight;
   ctx.drawImage(vid, 0,0); // the video
+  document.getElementById("myDIV").appendChild(canvas);
+
+  $('#numberOfImages').html(parseInt($('#numberOfImages').html()) + 1);
+
   return new Promise((res, rej)=>{
     canvas.toBlob(res, 'image/jpeg'); // request a Blob from the canvas
   });
 }
+
 function download(blob){
-  var fd = new FormData();
-  fd.append('image', blob, 'screenshot.jpeg');
+  fd.append('image', blob, `screenshot_${Math.floor(Date.now() / 1000)}.jpeg`);
+}
+
+function upload() {
+  $('#webcam').fadeOut();
+  $('#clickSnap').fadeOut();
+  $('#finalButton').fadeOut();
+
+  $('#Loader').fadeIn();
+
   $.ajax({
       type: 'POST',
       url: '/upload-image',
